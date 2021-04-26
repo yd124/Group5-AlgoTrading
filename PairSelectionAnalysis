@@ -20,7 +20,6 @@ Good log price graph
 ['ESNT', 'MTG'], ['TOWN', 'GVBK'], 
 ['CROX', 'CNGR'],['CCS', 'TMHC'], ['GCO', 'GIII']]
 
-
 2018-01-2/2021-04-15
 IF hour [10,15]
 TECH 3
@@ -41,9 +40,6 @@ More HC
 ['MCK', 'CAH']
 total profit percentage: 41.832
 
-
-
-
 FIN 11
 [['ESNT', 'MTG'], [pcsb,gnty], ['OTCM', 'RVT'], ['THFF', 'GSBC'], ['CZNC', 'FNLC'], ['BXS', 'FRME'], ['TMP', 'CATY'], ['BMTC', 'ABTX'], ['TOWN', 'GVBK'], ['DGICA', 'HIFS'], ['SFBS', 'CAC'], ['FMBH', 'AROW']]
 
@@ -60,8 +56,6 @@ FIN 11
 2021-04-15 16:30:00 :	11th total profit percentage: 141.633
 2021-04-15 16:30:00 :	12th total profit percentage: 581.659
 
-
-
 IND 4
 [['ALGT', 'HA'], ['WIRE', 'ALG'], ['CNI', 'NSC'], ['GRC', 'GMT']
 
@@ -69,7 +63,6 @@ IND 4
 2021-04-15 16:30:00 :	2th total profit percentage: 169.343
 2021-04-15 16:30:00 :	3th total profit percentage: 109.951
 2021-04-15 16:30:00 :	4th total profit percentage: 109.142
-
 
 CD 6
 [ ['ARGNA', 'JWAIA'], ['TOL', 'TPH'], ['LZB', 'RUSH'],
@@ -87,8 +80,6 @@ CS:3
 2021-04-15 16:30:00 :	1th total profit percentage: 71.137
 2021-04-15 16:30:00 :	2th total profit percentage: 111.744
 2021-04-15 16:30:00 :	3th total profit percentage: 1036.161
-
-
 
 If hour == 10
 TECH
@@ -133,8 +124,6 @@ HC
 2021-04-15 16:30:00 :	4th total profit percentage: 52.058
 2021-04-15 16:30:00 :	5th total profit percentage: 45.029
 2021-04-15 16:30:00 :	6th total profit percentage: 31.707
-
-
 
 CD double check
 
