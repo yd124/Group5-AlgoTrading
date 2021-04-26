@@ -1,0 +1,147 @@
+Tech 1: ['LFUS', 'AVT']
+HC：2  ['NUVA', 'SPNEV'], ['TMO', 'DHR'],
+FIN：7 ['ESNT', 'MTG'], ['BMTC', 'ABTX'], ['TOWN', 'GVBK'],['OTCM', 'RVT'], ['THFF', 'GSBC'],['FMBH', 'AROW'], ['TMP', 'CATY']
+IND： 1 ['CNI', 'NSC'],
+CD：4 ['TOL', 'TPH'], ['CROX', 'CNGR'],['CCS', 'TMHC'], ['GCO', 'GIII']
+CS：2  ['TDS', 'USM'], ['AMOV', 'AMX']
+
+One with weird log price graph
+['COHU', 'AMKR'], ['FLEXF', 'DGII'], ['LFUS', 'AVT']
+[['NUVA', 'SPNEV'], ['NEOG', 'LHCG'], ['ATH', 'SEM'], ['INCY', 'SGEN'],['LMAT', 'HYH']]
+['TOWN', 'GVBK'], ['DGICA', 'HIFS'], ['WIRE', 'ALG'], ['GRC', 'GMT']
+['WIRE', 'ALG'], ['GRC', 'GMT'],['ARGNA', 'JWAIA']
+
+Very Good log price graph
+['TMO', 'DHR'], ['OTCM', 'RVT']
+['CNI', 'NSC'], ['TOL', 'TPH']
+['TDS', 'USM'], ['AMOV', 'AMX']]
+
+Good log price graph 
+['ESNT', 'MTG'], ['TOWN', 'GVBK'], 
+['CROX', 'CNGR'],['CCS', 'TMHC'], ['GCO', 'GIII']]
+
+
+2018-01-2/2021-04-15
+IF hour [10,15]
+TECH 3
+['COHU', 'AMKR'], ['FLEXF', 'DGII'], ['LFUS', 'AVT']
+2021-04-15 16:30:00 :	1th total profit percentage: 30.588
+2021-04-15 16:30:00 :	2th total profit percentage: 37.198
+2021-04-15 16:30:00 :	3th total profit percentage: 130.914
+
+HC 6
+[['NUVA', 'SPNEV'], ['NEOG', 'LHCG'], ['ATH', 'SEM'],['TMO', 'DHR'], ['INCY', 'SGEN'],['LMAT', 'HYH']]
+2021-04-15 16:30:00 :	1th total profit percentage: 271.879
+2021-04-15 16:30:00 :	2th total profit percentage: 107.224
+2021-04-15 16:30:00 :	3th total profit percentage: 90.776
+2021-04-15 16:30:00 :	4th total profit percentage: 59.341
+2021-04-15 16:30:00 :	5th total profit percentage: 97.814
+2021-04-15 16:30:00 :	6th total profit percentage: 66.262
+More HC
+['MCK', 'CAH']
+total profit percentage: 41.832
+
+
+
+
+FIN 11
+[['ESNT', 'MTG'], [pcsb,gnty], ['OTCM', 'RVT'], ['THFF', 'GSBC'], ['CZNC', 'FNLC'], ['BXS', 'FRME'], ['TMP', 'CATY'], ['BMTC', 'ABTX'], ['TOWN', 'GVBK'], ['DGICA', 'HIFS'], ['SFBS', 'CAC'], ['FMBH', 'AROW']]
+
+2021-04-15 16:30:00 :	1th total profit percentage: 108.768
+2021-04-15 16:30:00 :	2th total profit percentage: 271.419 (limited data)
+2021-04-15 16:30:00 :	3th total profit percentage: 84.739
+2021-04-15 16:30:00 :	4th total profit percentage: 465.808
+2021-04-15 16:30:00 :	5th total profit percentage: 241.612
+2021-04-15 16:30:00 :	6th total profit percentage: 67.209
+2021-04-15 16:30:00 :	7th total profit percentage: 259.52
+2021-04-15 16:30:00 :	8th total profit percentage: 148.496
+2021-04-15 16:30:00 :	9th total profit percentage: 399.865
+2021-04-15 16:30:00 :	10th total profit percentage: 219.922
+2021-04-15 16:30:00 :	11th total profit percentage: 141.633
+2021-04-15 16:30:00 :	12th total profit percentage: 581.659
+
+
+
+IND 4
+[['ALGT', 'HA'], ['WIRE', 'ALG'], ['CNI', 'NSC'], ['GRC', 'GMT']
+
+2021-04-15 16:30:00 :	1th total profit percentage: 236.318
+2021-04-15 16:30:00 :	2th total profit percentage: 169.343
+2021-04-15 16:30:00 :	3th total profit percentage: 109.951
+2021-04-15 16:30:00 :	4th total profit percentage: 109.142
+
+
+CD 6
+[ ['ARGNA', 'JWAIA'], ['TOL', 'TPH'], ['LZB', 'RUSH'],
+['CROX', 'CNGR'],['CCS', 'TMHC'], ['GCO', 'GIII']]
+2021-04-15 16:30:00 :	1th total profit percentage: 178.815
+2021-04-15 16:30:00 :	2th total profit percentage: 102.349
+2021-04-15 16:30:00 :	3th total profit percentage: 210.481
+2021-04-15 16:30:00 :	4th total profit percentage: 174.701
+2021-04-15 16:30:00 :	5th total profit percentage: 157.592
+2021-04-15 16:30:00 :	6th total profit percentage: 141.185
+
+CS:3
+[['NWSAV', 'WPP'],  ['TDS', 'USM'], ['AMOV', 'AMX']]
+
+2021-04-15 16:30:00 :	1th total profit percentage: 71.137
+2021-04-15 16:30:00 :	2th total profit percentage: 111.744
+2021-04-15 16:30:00 :	3th total profit percentage: 1036.161
+
+
+
+If hour == 10
+TECH
+
+[ ['COHU', 'AMKR'], ['SWIR', 'SSTI'], ['LFUS', 'AVT'], ['PLXS', 'BHE']]
+
+2021-04-15 16:30:00 :	1th total profit percentage: 27.147
+2021-04-15 16:30:00 :	2th total profit percentage: 30.353
+2021-04-15 16:30:00 :	3th total profit percentage: 68.61
+2021-04-15 16:30:00 :	4th total profit percentage: 51.681
+
+FINANCIAL
+[['TOWN', 'GVBK'],['NFBK', 'GSBC'],['PCSB', 'GNTY'], ['TMP', 'CATY'],['CZNC', 'FNLC'],['BMTC', 'ABTX'],['DGICA', 'HIFS'], ['FMBH', 'AROW'], ['NMIH', 'MTG']]
+2021-04-15 16:30:00 :	1th total profit percentage: 176.835
+2021-04-15 16:30:00 :	2th total profit percentage: 129.432
+2021-04-15 16:30:00 :	3th total profit percentage: 102.753
+2021-04-15 16:30:00 :	4th total profit percentage: 89.686
+2021-04-15 16:30:00 :	5th total profit percentage: 76.094
+2021-04-15 16:30:00 :	6th total profit percentage: 55.758
+2021-04-15 16:30:00 :	7th total profit percentage: 49.213
+2021-04-15 16:30:00 :	8th total profit percentage: 129.266
+2021-04-15 16:30:00 :	9th total profit percentage: 66.124
+
+IND
+[['ALGT', 'HA'],['GMT', 'ALG'], ['FSS', 'WIRE']]
+
+2021-04-15 16:30:00 :	1th total profit percentage: 122.406
+2021-04-15 16:30:00 :	2th total profit percentage: 102.277
+2021-04-15 16:30:00 :	3th total profit percentage: 31.99
+
+CS
+[['SBC', 'AMOV'], ['BATRK', 'BATRA'], ['USM', 'TDS']]
+2021-04-15 16:30:00 :	1th total profit percentage: 32.534
+2021-04-15 16:30:00 :	2th total profit percentage: 52.391
+2021-04-15 16:30:00 :	3th total profit percentage: 41.969
+
+HC
+[['NEOG', 'LHCG'], ['TCLN', 'CARA'], ['DCPH', 'PTCT'], ['IART', 'PDCO'], ['NUVA', 'SPNEV'], ['LMAT', 'HYH']]
+2021-04-15 16:30:00 :	1th total profit percentage: 68.986
+2021-04-15 16:30:00 :	2th total profit percentage: 55.832
+2021-04-15 16:30:00 :	3th total profit percentage: 88.731
+2021-04-15 16:30:00 :	4th total profit percentage: 52.058
+2021-04-15 16:30:00 :	5th total profit percentage: 45.029
+2021-04-15 16:30:00 :	6th total profit percentage: 31.707
+
+
+
+CD double check
+
+[['ARGNA', 'JWAIA'], ['TOL', 'TPH'], ['DRI', 'ARMK'], ['IHG', 'BURL'], ['CROX', 'CNGR']]
+2021-04-15 16:30:00 :	1th total profit percentage: 57.114
+2021-04-15 16:30:00 :	2th total profit percentage: 66.788
+2021-04-15 16:30:00 :	3th total profit percentage: 58.051
+2021-04-15 16:30:00 :	4th total profit percentage: 73.343
+2021-04-15 16:30:00 :	5th total profit percentage: 182.212
+
