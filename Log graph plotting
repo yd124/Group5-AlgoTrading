@@ -9,8 +9,7 @@ P = pair[0]
 Q = pair[1]
 eP = qb.AddEquity(P)
 eQ = qb.AddEquity(Q)
-start_time = datetime(2021,1,2)
-#start_time = datetime(2018,1,2)
+start_time = datetime(2018,1,2)
 end_time = datetime(2021,4,15)
 history = qb.History(qb.Securities.Keys, start_time, end_time, Resolution.Hour)
 
