@@ -28,14 +28,6 @@ from datetime import datetime
 # from VolatilityModel import CustomVolatilityModel
 # from RiskManagement import MaximumDrawdownPercentPortfolio
 
-'''
-'NOW~PAYC': (-19.849358137303398, 0.0),
- 'VRNT~CREE': (-19.842421550717358, 0.0),
- 'VRNT~QRVO': (-19.09407621361636, 0.0),
- 'NATI~KEYS': (-19.093029281786407, 0.0),
- 'BNFT~BL': (-18.85892806005321, 0.0),
- '''
-
 # Compute the Value-at-Risk and Tail VaR for Pairs-Trading Portfolio
 class RiskManagementForPairTrading(QCAlgorithm):
     def Initialize(self):
