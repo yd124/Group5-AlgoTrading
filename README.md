@@ -11,5 +11,5 @@ Yuqing was working on daily trading at 10AM using equity's hour data in OnePairT
 Qiaofeng was working on hour trading.
 
 Yuqing and Qiaofeng combine their work and develop their multiple pair trading strategy without slippage model in (Old)MultiplePairTradingStrategy.
-They improve strategy's performance (with or without slippage model) in (New)MultiplePairTradingStrategy.
+They improve strategy's performance (with or without slippage model) in (New)MultiplePairTradingStrategy. Yuqing use different strategies in (Old) and (New) to track the buying power of pairs during the trading days. 
 
