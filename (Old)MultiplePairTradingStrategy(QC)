@@ -61,9 +61,7 @@ class MultiplePairTrading(QCAlgorithm):
         ['TOL', 'TPH'], ['CROX', 'CNGR'],['CCS', 'TMHC'], ['GCO', 'GIII'],\
         ['TDS', 'USM'], ['AMOV', 'AMX'],['NUVA', 'SPNEV'], ['TMO', 'DHR'],\
         ['CNI', 'NSC'], ['LFUS', 'AVT']] 
-        
-        #Fee and slippage---------------------------------------------------
-        self.slippagemodel = True
+ 
         
         # Add Equities ----------------------------------------------------------------
         self.num = len(self.pairs)  
@@ -77,8 +75,6 @@ class MultiplePairTrading(QCAlgorithm):
                 equity = self.AddEquity(ticker, Resolution.Hour)
                 symbol.append(self.Symbol(ticker))
                 security.append(equity.Symbol)
-                if self.slippagemodel:
-                    self.Securities[ticker].SetSlippageModel(CustomSlippageModel(self))
             self.symbols.append(symbol)
             self.securities.append(security)
        
@@ -537,14 +533,3 @@ class MultiplePairTrading(QCAlgorithm):
         
         return [adjusted_enter, adjusted_exit]
         
-        
-#Slippage Model---------------------
-class CustomSlippageModel:
-    def __init__(self, algorithm):
-        self.algorithm = algorithm
-        
-    def GetSlippageApproximation(self, asset, order):
-        # custom slippage math
-        slippage = d.Decimal(asset.Price) * d.Decimal(0.0001 * np.log10(2*float(order.AbsoluteQuantity)))
-        #self.algorithm.Log("CustomSlippageModel: " + str(slippage))
-        return slippage
