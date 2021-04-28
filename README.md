@@ -5,5 +5,5 @@ Qiaofeng uses the log ploting graph to verify our choices and narrow down the nu
 
 Pair trading strategy:
 Yuqing was working on daily trading at 10AM using equity's hour data in OnePairTradingStrategy
-Qiaofeng was working on hour trading. Yuqing and Qiaofeng combine their work and develop their multiple pair trading strategy without/with slippage model in (New)MultiplePairTradingStrategy. 
+Qiaofeng was working on hour trading. Yuqing and Qiaofeng combine their work and develop their multiple pair trading strategy without/with slippage model in MultiplePairTradingStrategy. 
 
