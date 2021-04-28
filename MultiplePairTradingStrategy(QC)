@@ -1,0 +1,645 @@
+# reference:
+# sharpe ratio: https://github.com/QuantConnect/Lean/blob/6af20c3d8a5713ef1e58ae924e05cde0a5fff8fd/Common/Statistics/Statistics.cs
+
+from clr import AddReference
+AddReference("System")
+AddReference("QuantConnect.Algorithm")
+AddReference("QuantConnect.Common")
+
+from System import *
+from QuantConnect import *
+from QuantConnect.Algorithm import *
+from QuantConnect.Orders import *
+from QuantConnect.Orders.Fees import *
+from QuantConnect.Securities import *
+from QuantConnect.Orders.Fills import *
+from QuantConnect.Brokerages import *
+from QuantConnect.Algorithm.Framework.Risk import *
+from QuantConnect.Data.Custom.USTreasury import *
+
+from sklearn.linear_model import LinearRegression
+import numpy as np
+import pandas as pd
+import math 
+import statsmodels.api as sm
+from statsmodels.tsa.stattools import coint, adfuller
+from datetime import datetime
+import decimal as d
+import re
+
+class MultiplePairTrading(QCAlgorithm):
+    def Initialize(self):
+        self.S = 1 # 0/1/2/3: testing/in/march/out sample
+        self.M = 4 # method1&2&3&4
+        self.R = 0 # 0: no 1:stop-loss 2:maximum drawdown 3:std of pnl 4:var
+        self.slippagemodel = True
+        self.riskmodel = True
+        
+        # Risk Management Testing for Method 3 2018/1/2 - 2018/1/31
+        if (self.S == 0):
+            self.SetStartDate(2018, 1, 2)
+            self.SetEndDate(2018,9,1)
+
+        # In-sample between 1/2/2018 and 4/15/2021
+        if (self.S == 1):
+            self.SetStartDate(2018, 1, 2)      
+            self.SetEndDate(2021,4,15)
+        
+        # Stress Testing between 3/1/2020 and 3/31/2020
+        if (self.S == 2):     
+            self.SetStartDate(2020, 3, 1)      
+            self.SetEndDate(2020,3,31)
+        
+        # Out-sample between 1/4/2016 and 12/29/2017
+        if (self.S == 3):
+            self.SetStartDate(2016, 1, 4)      
+            self.SetEndDate(2017,12,29)
+        
+        self.cash = 1000000  
+        self.SetCash(self.cash)
+        
+        # Brokerage ------------------------------------------------------------
+        self.SetBrokerageModel(BrokerageName.InteractiveBrokersBrokerage, AccountType.Margin) 
+        
+        #Fee and slippage---------------------------------------------------
+        
+        if self.slippagemodel:
+            # self.SetSecurityInitializer(lambda s: s.SetSlippageModel(CustomSlippageModel(self)))
+            self.SetSecurityInitializer(lambda s: s.SetSlippageModel(ConstantSlippageModel(0.002)))
+        
+        if self.riskmodel:
+            self.SetRiskManagement(MaximumDrawdownPercentPortfolio(0.2))
+            
+        self.resolution = Resolution.Hour
+        # self.UniverseSettings.Resolution = Resolution.Hour
+        
+        # Pairs Selection ----------------------------------------------------------------
+        # self.pairs =[['RUSHA', 'RUSH']] 
+ 
+        # self.pairs = [['OTCM', 'RVT']]
+        self.pairs = [['ESNT', 'MTG'], ['BMTC', 'ABTX'], ['TOWN', 'GVBK'],\
+        ['OTCM', 'RVT'], ['THFF', 'GSBC'],['FMBH', 'AROW'], ['TMP', 'CATY'],\
+        ['TOL', 'TPH'], ['CROX', 'CNGR'],['CCS', 'TMHC'], ['GCO', 'GIII'],\
+        ['TDS', 'USM'], ['AMOV', 'AMX'],['NUVA', 'SPNEV'], ['TMO', 'DHR'],\
+        ['CNI', 'NSC'], ['LFUS', 'AVT']] 
+        
+        
+        # Add Equities ----------------------------------------------------------------
+        self.num = len(self.pairs)  
+        self.symbols = []
+        self.securities = []
+        
+        for pair in self.pairs:
+            symbol = []
+            security = []
+            for ticker in pair:
+                equity = self.AddEquity(ticker, Resolution.Hour)
+                symbol.append(self.Symbol(ticker))
+                security.append(equity.Symbol)
+            self.symbols.append(symbol)
+            self.securities.append(security)
+        
+        # Fund Allocation ------------------------------------------------------
+        self.buying_power = []
+        weight = []
+        
+      
+        # Method 1: Equal Allocation:
+        if (self.M == 1):
+            for i in range(self.num):
+                weight.append(1/self.num)
+        
+        # Method 2 & 3:
+        one_year_volatility_inverse = []
+        for i in range(self.num):
+            one_year_volatility_inverse.append(1/self.one_year_volatility_calc(self.symbols[i][0], self.symbols[i][1]))
+        self.Log(f"one_year_volatility {one_year_volatility_inverse}")
+        # Method 2: reduce allocation when volatility > 1
+        if (self.M == 2):
+            for i in range(self.num):
+                weight.append(1/ self.num * min(1,one_year_volatility_inverse[i]))
+        
+        # Method 3: normalized weight by volatility
+        if (self.M == 3):
+            total_inverse_one_year_volatility = np.sum(one_year_volatility_inverse)
+            
+            for i in range(self.num):
+                weight.append(one_year_volatility_inverse[i]/total_inverse_one_year_volatility)
+                
+                
+        # Method 4: Allocate more weight on better performance pair
+        # Run Method 1 & 2 & 3 in-sample, then determine the weight percentage
+        if (self.M == 4):
+            performance = [1,2,2,1,2,3,2,1,3,3,1,1,3,2,1,1,3]
+            for i in range(self.num):
+                performance[i] = performance[i] * one_year_volatility_inverse[i] 
+            total_performance = np.sum(performance)
+            for i in range(self.num):
+                weight.append(performance[i]/total_performance)
+                
+        # self.Log(f"{weight}")
+        for i in range(self.num):
+           self.buying_power.append([ 2*self.cash * weight[i] ])
+        
+        # ----------------------------------------------------------------
+        self.fillPrices = {}
+        self.orderFees = {}
+        self.filledQuantities = {}
+        self.enter = []
+        self.exit = []
+        self.lookback = []
+        self.stdlookback = 40
+        self.ticker_holdings = []   # self.Portfolio[self.pairs[i][0]]
+        self.total_profit_loss = [] # total profit and loss of i-th pair during the sample period
+        self.profit_loss_percentage = []    # total profit and loss/ initial cash
+        self.array = []
+        self.profit_loss = []
+        self.init_orderFees = {}
+        self.init_fillPrice = {}
+        self.init_filledQuantities = {}
+        for i in range(self.num):
+            self.enter.append(1)
+            self.exit.append(0)
+            self.lookback.append(self.stdlookback)
+            self.ticker_holdings.append(self.Portfolio[self.pairs[i][0]])
+            self.total_profit_loss.append([0])
+            self.profit_loss_percentage.append([0])
+            self.profit_loss.append(0)
+
+        # Cash Buffer ------------------------------------------------------------
+        # Adjust the cash buffer from the default 2.5% to 5%
+        self.Settings.FreePortfolioValuePercentage = 25
+        self.buffer = 0.25
+        # self.buffer = 0.45
+        
+        # Entry Condition ----------------------------------------------------------
+        # beta should be inside [0.75, 1.25] since beta -> 1 is much more profitable
+        # self.betarange = 0.25  [1-betarange, 1+betarange]
+        self.betarange = 0.75  #[betarange, 1/betarange]
+        
+
+
+        
+        
+        # Risk Management ------------------------------------------------------
+        # stop-loss
+        # [4,4,4,4,?,?,4,4,4,4,4,4,4,4,?,4,?]
+        # stop_limit = self.GetParameter("stop-limit")
+        # self.stop = [4,4,4,4,5,5,4,4,4,4,float(stop_limit),4,4,4,5,4,5]
+        # self.stop = [4,4,4,4,5,5,4,4,4,4,4,4,4,4,5,4,5]
+        self.stop = []
+        for i in range(self.num):
+            self.stop.append(4)
+        # maximum drawdown
+        self.vt = []
+        self.maximum_drawdown_percentage = 0.2
+        self.lastpl = 0
+        # daily-pnl-volatility
+        self.port_daily_pnl = [0]
+        # sharpe ratio
+        self.rate_of_return = []    
+        self.daily_performance = []
+        # valu-at-risk
+        self.var_limit = []  #[5000, 10000, 20000,10000]
+        for i in range(self.num):
+            self.var_limit.append(2000)
+        self.ci = 0.95
+        
+        
+        # Execution ------------------------------------------------------------
+        self.SetExecution(ImmediateExecutionModel())       
+        
+        #  ------------------------------------------------------------
+        self.yesterday_total_profit = 0
+        self.yesterday_total_fees = 0
+        self.yesterday_total_unrealized_profit = 0       
+        self.yesterday_total_portfolio_value = self.cash
+ 
+            
+        #Add-on fine tuning -----------------------------------------------
+        self.adjustthreshold = False
+        self.voladjust = True
+        self.vixadjust = False
+        self.exit_change = 0
+        self.weightmethod = 'cointegration'
+        self.calmperiod = False
+        #self.calmperiodlength = timedelta(1)
+        self.abnormalbetasell = False
+        self.altZscore = False
+        self.adjustAltzscore = False
+        self.Zscorediff = 3
+        self.altZscorestop = 5
+        #self.maxpercentageloss = -0.1
+        #self.maxlosslimit = True
+        self.volcapitalalloc = False
+        self.changelookback = False
+        self.stdvol = 40
+        self.enhancedvol = False
+        self.change_wt = False
+        self.opt= int(float(self.GetParameter("opt")))
+        #self.opt = 3
+        #self.vix = self.AddData(CBOE, "VIX").Symbol
+        self.adftest = False 
+        self.adfvalue = 0.01
+
+        #lookback period---------------------------------------
+        self.inivol = [1] * self.num
+        if self.changelookback:
+            vol = [0] * self.num
+            for i in range(self.num):
+                histone = np.log(self.History(self.symbols[i][0], 210, self.resolution).close.values)
+                histtwo = np.log(self.History(self.symbols[i][1], 210, self.resolution).close.values)
+                vol1 = np.std(histone) / np.mean(histone)
+                vol2 = np.std(histtwo) / np.mean(histtwo)
+                vol[i] = math.log10((vol1 + vol2)/2)
+            #vol_norm = [(vol[i] - sum(vol) / len(vol)) / statistics.pstdev(vol) for i in range(self.num)]
+            for i in range(self.num):
+                self.lookback[i] = int((self.stdvol - 7 * round((vol[i] - np.sum(vol) / len(vol))*3)).item())
+                self.inivol[i] = (vol[i] - sum(vol) / len(vol))                
+                if abs(vol[i] - np.sum(vol) / len(vol)) > 1.2:
+                    self.Log(str(self.pairs[i]) + " has weird volatility!")
+                if self.lookback[i] < 14:
+                    self.Log(str(self.pairs[i]) + " has too much volatility!")
+                    self.lookback[i]  = 14
+                # self.Log(str(self.pairs[i]) + "  " + str(self.lookback[i]))
+        
+        # Warm Up --------------------------------------------------------------        
+        self.SetWarmUp(timedelta(max(self.lookback)))
+    
+    def OnEndOfAlgorithm(self):
+        self.Log("checking the performance of the pairs: ")
+        for i in range(self.num):
+            self.Log(f"{i+1}th total profit percentage: {self.profit_loss_percentage[i][-1]}")
+            self.array.append(self.profit_loss_percentage[i][-1])
+            # self.Log(f"{i+1}th total profit loss: {self.total_profit_loss[i][-1]}")
+            # pnl_trade = [self.profit_loss_percentage[i][j+1]-self.profit_loss_percentage[i][j] for j in range(len(self.profit_loss_percentage[i])-1)]
+            #max_profit = max(pnl_trade)
+            #max_drawdown = min(pnl_trade)
+            # if pnl_trade is not []:    
+            #     self.Log(f"{i+1}th: max profit {max(pnl_trade)}, max drawdown {min(pnl_trade)}")
+            #     self.Log(f"{i+1}th: drawdown times {sum(1 for i in pnl_trade if i < 0)}")
+        self.Log(f"{self.array}")                
+            
+    def OnOrderEvent(self, orderEvent):
+        order = self.Transactions.GetOrderById(orderEvent.OrderId)
+        if orderEvent.Status == OrderStatus.Filled: 
+            self.fillPrices[orderEvent.Symbol] = orderEvent.FillPrice
+            self.orderFees[orderEvent.Symbol] = orderEvent.OrderFee
+            self.filledQuantities[orderEvent.Symbol] = orderEvent.Quantity
+            # self.Log("{0}: {1}: {2}".format(self.Time, order.Type, orderEvent))
+            pass
+   
+    def order_fee_calc(self,i):
+        old1 = str(self.orderFees[self.symbols[i][0]])
+        old2 = str(self.orderFees[self.symbols[i][1]])
+        new1 = old1.replace("USD", "")
+        new2 = old2.replace("USD", "")
+        # self.liq_fee[i] = float(new1)+float(new2)
+        return float(new1)+float(new2)
+    
+    def liq_pair(self, i): 
+        
+        pos1 = self.Portfolio[self.symbols[i][0]].Quantity
+        pos2 = self.Portfolio[self.symbols[i][1]].Quantity
+
+
+        if (pos1 != 0 and pos2 != 0):    
+            price1 = self.init_fillPrice[self.symbols[i][0]] 
+            price2 = self.init_fillPrice[self.symbols[i][1]] 
+            
+            self.Liquidate(self.pairs[i][0])
+            self.Liquidate(self.pairs[i][1])
+
+            self.profit_loss[i] += (self.fillPrices[self.symbols[i][0]] - price1) * pos1 + (self.fillPrices[self.symbols[i][1]] - price2) * pos2 - self.order_fee_calc(i)
+            
+            self.buying_power[i].append(self.buying_power[i][-1] + self.profit_loss[i]  * 2)
+            self.total_profit_loss[i].append( self.total_profit_loss[i][-1] + self.profit_loss[i])
+            self.profit_loss_percentage[i].append(round(self.total_profit_loss[i][-1]/(self.buying_power[i][0]/2) * 100, 3))
+            self.profit_loss[i] = 0
+    
+    def OnData(self,data):
+        if self.IsWarmingUp: return
+        if (self.Time.hour >= 10) and (self.Time.hour < 15):
+            for i in range(self.num):
+                if not (data.ContainsKey(self.pairs[i][0]) and data.ContainsKey(self.pairs[i][1])):
+                    continue       
+                [zscore, beta, adf] = self.port_check(self.symbols[i][0], self.symbols[i][1], data[self.symbols[i][0]].Price, data[self.symbols[i][1]].Price, i)
+                if zscore == None: 
+                    self.Log("different length!")
+                    continue
+                wt1 = beta/(1 + beta)
+                wt2 = 1/(1 + beta)
+                
+                [actual_enter, actual_exit] = self.AdjustedThreshold(self.enter[i], self.exit[i], i)
+                
+                if self.ticker_holdings[i].Invested:
+                    
+                    if (self.ticker_holdings[i].IsShort and zscore >= -actual_exit) or \
+                        (self.ticker_holdings[i].IsLong and zscore <= actual_exit):
+                            self.liq_pair(i)
+                    else: 
+                        if (self.R == 0):
+                            pass
+                                    
+                        # Risk Management: Stop-Loss -----------------------------------      
+                        if (self.R == 1): 
+                            self.risk_management_stop_loss(i, zscore)
+                        
+                        # Risk Management: Maximum Drawdown -----------------------------------
+                        if (self.R == 2):
+                            self.risk_management_maximum_drawdown(self.maximum_drawdown_percentage)                    
+                       
+                        # Risk Management: Daily PnL Volatility ------------------------
+                        # daily pnl volatility < 5% of equity  
+                        if (self.R == 3):    
+                            self.risk_management_daily_pnl_volatility(0.05)    
+                        
+                        # Risk Management: Value-at-Risk -------------------------------
+                        # Adjust weight
+                        if (self.R == 4): 
+                            self.risk_management_value_at_risk(i, wt1, wt2, data[self.symbols[i][0]].Price, data[self.symbols[i][1]].Price)
+
+                elif beta >= self.betarange and beta <= 1 / self.betarange:
+                    price1 = data[self.symbols[i][0]].Price
+                    price2 = data[self.symbols[i][1]].Price
+                    
+                    actual_buffer = 1 - self.buffer
+                    if self.adftest and adf[1] > self.adfvalue:
+                        actual_buffer = actual_buffer / (1 + math.log10(adf[1])-math.log10(self.adfvalue))
+                        if actual_buffer >= 1 or actual_buffer <= self.buffer:
+                            continue                    
+                    
+                    # Sell ticker2 Buy ticker1
+                    if zscore > actual_enter:
+                        [pos1, pos2] = self.pos_calc(i, 0, wt1, wt2, price1, price2, self.buying_power[i][-1] * (actual_buffer))
+                        self.MarketOrder(self.symbols[i][1], pos2, True)
+                        self.MarketOrder(self.symbols[i][0], pos1, True)
+                        
+    
+                    # Sell ticker1, Buy ticker2
+                    if zscore < - actual_enter:
+                        [pos1, pos2] = self.pos_calc(i, 1, wt1, wt2, price1, price2, self.buying_power[i][-1] * (actual_buffer))
+                        self.MarketOrder(self.symbols[i][0], pos1, True)
+                        self.MarketOrder(self.symbols[i][1], pos2, True)
+                    
+                    if self.ticker_holdings[i].Invested:  
+                        self.init_fillPrice[self.symbols[i][0]] =  self.fillPrices[self.symbols[i][0]]
+                        self.init_fillPrice[self.symbols[i][1]] = self.fillPrices[self.symbols[i][1]]
+                        self.init_filledQuantities[self.symbols[i][0]] = self.filledQuantities[self.symbols[i][0]]
+                        self.init_filledQuantities[self.symbols[i][1]] = self.filledQuantities[self.symbols[i][1]]
+                        self.profit_loss[i] = 0 - self.order_fee_calc(i) 
+                else:
+                    pass
+ 
+    # Calculate market order position
+    def pos_calc(self, i, signal, wt1, wt2, price1, price2, C):
+        pos1 = Math.Pow(-1, signal) * round(wt1 * C / price1)
+        pos2 = Math.Pow(-1, signal + 1) * round(wt2 * C / price2)
+        return [pos1,pos2]
+        
+        
+            
+    def OnEndOfDay(self, symbol):
+        self.daily_performance.append((self.Portfolio.TotalPortfolioValue - self.yesterday_total_portfolio_value)/self.yesterday_total_portfolio_value  )
+        self.port_daily_pnl.append(self.get_port_daily_pnl())
+        self.yesterday_total_profit = self.Portfolio.TotalProfit
+        self.yesterday_total_fees = self.Portfolio.TotalFees
+        self.yesterday_total_unrealized_profit = self.Portfolio.TotalUnrealizedProfit
+        self.yesterday_total_portfolio_value = self.Portfolio.TotalPortfolioValue
+        
+    def get_port_daily_realized_pnl(self):
+        daily_gross_profit = self.Portfolio.TotalProfit - self.yesterday_total_profit
+        daily_fees = self.Portfolio.TotalFees - self.yesterday_total_fees
+        return daily_gross_profit - daily_fees
+    
+    def get_port_daily_unrealized_pnl(self):
+        return self.Portfolio.TotalUnrealizedProfit - self.yesterday_total_unrealized_profit
+    
+    def get_port_daily_pnl(self):
+        return self.get_port_daily_unrealized_pnl() + self.get_port_daily_realized_pnl()
+    
+    # Risk Management ----------------------------------------------------------
+    ## Stop-Loss ---------------------------------------------------------------
+    def risk_management_stop_loss(self, i, zscore):
+        if (self.ticker_holdings[i].IsShort and zscore <= -self.stop[i]) or \
+            (self.ticker_holdings[i].IsLong and zscore >= self.stop[i]):
+                self.liq_pair(i)      
+    
+    def risk_management_value_at_risk(self, i, wt1, wt2, price1, price2):
+        var = self.var_calc(i)
+        if (var < -self.var_limit[i]): 
+            ratio = -self.var_limit[i]/var
+            [adj_wt1, adj_wt2]  = self.adjust_wt(i, ratio, wt1, wt2)
+            # Stock Value
+            C = abs(price1 * self.Portfolio[self.pairs[i][0]].Quantity)+\
+                abs(price2 * self.Portfolio[self.pairs[i][1]].Quantity)
+            # self.Log(f"{i}-th holdings {self.Portfolio.TotalHoldingsValue} and {C} and total equity {self.Portfolio.TotalPortfolioValue}")
+            pos1 = round(adj_wt1 * C / price1)
+            pos2 = round(adj_wt2 * C / price2)
+            
+            self.adjust_market_value(i, pos1,pos2 )
+                
+    def var_calc(self, i):
+        if (self.Portfolio[self.pairs[i][0]].Quantity == 0) and (self.Portfolio[self.pairs[i][1]].Quantity):
+            return 0
+        else: 
+            port_diff = pd.DataFrame(data = self.port_daily_pnl[-self.stdlookback:])
+            pnl =port_diff.dropna()
+            pnl['pct_rank'] = pnl.rank(pct=True)
+            pnl.columns =['daily_pl', 'pct_rank']
+            pnl = pnl[pnl.pct_rank< 1-self.ci] # Find the tail distribution
+            return pnl.daily_pl.max() # the cuto off point is the VaR 
+    
+    def adjust_wt(self,i, ratio, wt1, wt2):
+        adj_wt1 = wt1 * (1 - ratio)
+        adj_wt2 = wt2 * (1 - ratio) 
+        return [adj_wt1, adj_wt2]  
+        
+    def adjust_market_value(self, i, pos1, pos2):
+        if (pos1 < abs(self.Portfolio[self.symbols[i][0]].Quantity) and pos2 < abs(self.Portfolio[self.symbols[i][1]].Quantity)): 
+            # sell stock2 buy stock1 
+            if self.ticker_holdings[i].IsShort:
+                self.MarketOrder(self.symbols[i][1], -pos2, True)
+                self.MarketOrder(self.symbols[i][0], pos1, True)
+            
+            # sell stock1 buy stock2
+            if self.ticker_holdings[i].IsLong:
+                self.MarketOrder(self.symbols[i][0], -pos1, True)
+                self.MarketOrder(self.symbols[i][1], pos2, True)   
+            
+            fill_pos1 = self.filledQuantities[self.symbols[i][0]]
+            fill_pos2 = self.filledQuantities[self.symbols[i][1]]    
+            price1 = self.init_fillPrice[self.symbols[i][0]] 
+            price2 = self.init_fillPrice[self.symbols[i][1]] 
+            
+            # self.Log(f"quantity {self.Portfolio[self.symbols[i][0]].Quantity} and {self.fillPrices[self.symbols[i][0]]*fill_pos1}")
+            self.profit_loss[i] += (self.fillPrices[self.symbols[i][0]] - price1) * (-fill_pos1) + (self.fillPrices[self.symbols[i][1]] - price2) * (-fill_pos2) - self.order_fee_calc(i)
+        
+   
+     ## Maximum Drawdown ---------------------------------------------------------------
+    def risk_management_maximum_drawdown(self, c):
+        self.cum_pnl = self.Portfolio.TotalUnrealizedProfit +self.Portfolio.TotalProfit
+        self.vt.append(self.cum_pnl)
+        self.pl = np.array(self.vt) - self.lastpl
+        
+        maxx = self.pl.max()
+        # latestpl = self.pl[len(self.pl)-1]
+        # self.maxdrawdown = maxx - latestpl
+        minn = self.pl.min()
+        self.maxdrawdown = maxx - minn
+        if (maxx > 0 and self.maxdrawdown > maxx * c):
+            # self.lastpl = latestpl
+            for i in range(self.num):
+                if self.ticker_holdings[i].Invested:
+                    self.liq_pair(i)
+            self.vt = []
+      
+    ## Daily PnL Volatility---------------------------------------------------------------
+   
+    def risk_management_daily_pnl_volatility(self, c):
+        self.Log(f"std: {self.port_daily_pnl_std() }")
+        if (self.port_daily_pnl_std() >= c * self.Portfolio.TotalPortfolioValue):
+            for i in range(self.num):
+                ratio = c * self.Portfolio.TotalPortfolioValue/self.port_daily_pnl_std()
+                [adj_wt1, adj_wt2]  = self.adjust_wt(i, ratio, wt1, wt2) 
+                # pair[i] holdings value 
+                C = abs(self.Portfolio[self.pairs[i][0]].Price * self.Portfolio[self.pairs[i][0]].Quantity)+\
+                abs(self.Portfolio[self.pairs[i][1]].Price * self.Portfolio[self.pairs[i][1]].Quantity)
+                self.adjust_market_value(i,adj, adj_wt1, adj_wt2,price1, price2, C )
+    '''
+    
+    def risk_management_daily_pnl_volatility(self, c):
+        if (self.port_daily_pnl_std() >= c * self.Portfolio.TotalPortfolioValue):
+            for i in range(self.num):
+                self.liq_pair(i)
+    '''         
+    def port_daily_pnl_std(self):
+        return np.std(self.port_daily_pnl[-self.stdlookback:])    
+    
+
+    ##### ----------------------------------------------------------------------
+
+    def regr_calc(self, x, y):
+        if len(x) != len(y):
+            return [None,None,None,None]
+        regr = LinearRegression()
+        x_constant = np.column_stack([np.ones(len(x)), x])
+        regr.fit(x_constant, y)
+        beta = regr.coef_[1]  # weight of ticker1: ticker2 = beta : 1
+        alpha = regr.intercept_
+        res = y - x*beta - alpha
+        mean = np.mean(res)
+        std = np.std(res)
+        zscore = (res[-1] - mean)/std 
+        adf = adfuller(res)        
+        return [std, zscore, beta, adf]
+        
+    def port_check(self, symbol1, symbol2, open1, open2, i):
+        hist1 = self.History(symbol1, self.lookback[i], self.resolution).open
+        hist2 = self.History(symbol2, self.lookback[i], self.resolution).open
+        hist1.index = hist1.index.droplevel(0)
+        hist2.index = hist2.index.droplevel(0)
+        hist1_r = hist1[(hist1.index.isin(hist2.index))]
+        hist2_r = hist2[(hist2.index.isin(hist1.index))]
+        x = np.log(np.append(hist1_r.values, open1))
+        y = np.log(np.append(hist2_r.values, open2))
+        [std, zscore, beta, adf] = self.regr_calc(x, y)
+        
+        return [zscore, beta, adf]
+    
+    def one_year_volatility_calc(self, symbol1, symbol2):
+        lookback =252
+        hist1 = self.History(symbol1, lookback, self.resolution)
+        hist2 = self.History(symbol2, lookback, self.resolution)
+        if 'open' in hist1.columns and 'open' in hist2.columns:
+            hist1 = hist1.open
+            hist2 = hist2.open
+        else:
+            return 1
+
+        hist1.index = hist1.index.droplevel(0)
+        hist2.index = hist2.index.droplevel(0)
+        hist1_r = hist1[(hist1.index.isin(hist2.index))]
+        hist2_r = hist2[(hist2.index.isin(hist1.index))]
+        x = np.log(hist1_r.values)
+        y = np.log(hist2_r.values)
+        # if (len(x) != lookback)  or (len(y) != lookback):
+        #     return 1
+        [std, zscore, beta, adf] = self.regr_calc(x, y)
+        if std is None:
+            std = 1
+        return std
+
+
+    #Add-on dynamic functions---------------------------------------------------------------
+    def WeightFunction(self, pair):
+        if self.weightmethod == 'cointegration':
+            beta = self.beta[pair]
+        elif self.weightmethod == 'volatility':
+            vol1 = np.std(np.diff(self.histone))
+            vol2 = np.std(np.diff(self.histtwo))
+            beta = vol1 / vol2
+        elif self.weightmethod == 'EW':
+            beta = 1
+        elif self.weightmethod == 'min distance':
+            beta = minimize(self.PriceDistance, 1, args = (self.histone, self.histtwo), \
+                        constraints = ({'type': 'ineq', 'fun': lambda x: x - 0.5},\
+                                        {'type': 'ineq', 'fun': lambda x: 1.5 - x})).x[0]
+        elif self.weightmethod == 'correlation return':
+            x = np.diff(self.histone)
+            y = np.diff(self.histtwo)
+            beta = self.Regression(x,y)[1]
+        
+        else: 
+            beta = 0
+    
+        return beta
+    
+    def AdjustedThreshold(self, enter, exit, i):
+        if self.adjustthreshold is False:
+            return [enter, exit]
+        
+        vol_factor = 1
+        actual_vol_factor = 1
+        
+        if self.opt == 3:
+            return [enter, exit]
+        if self.vixadjust and self.opt == 0:
+            vix_hist = self.History([self.vix], 5 , Resolution.Daily)
+            vol_factor = 0.9 + vix_hist['close'][-1] / 100
+        
+        if self.voladjust and self.opt != 0:
+            histone = np.log(self.History(self.symbols[i][0], self.lookback[i], self.resolution).open.values)
+            histtwo = np.log(self.History(self.symbols[i][0], self.lookback[i], self.resolution).open.values)
+            vol1 = np.std(histone) / np.mean(histone)
+            vol2 = np.std(histtwo) / np.mean(histtwo)
+    
+            vol = max(vol1, vol2)
+            vol_factor = 0.9 - float(self.lookback[i] -self.stdvol) / 70 + math.sqrt(10 * vol)            #self.Log(str(pair) + " vol_factor:" + str(vol_factor))
+
+        if not self.enhancedvol:
+            actual_vol_factor = vol_factor
+            
+        if self.opt== 1:
+            pass
+        elif self.opt == 2:
+            actual_vol_factor = 1 + self.inivol[i]
+        else:
+            pass
+                    
+        adjusted_enter = enter * actual_vol_factor
+        adjusted_exit = self.exit_change + exit * actual_vol_factor
+        
+        return [adjusted_enter, adjusted_exit]
+
+        
+#Slippage Model---------------------
+class CustomSlippageModel:
+    def __init__(self, algorithm):
+        self.algorithm = algorithm
+        
+    def GetSlippageApproximation(self, asset, order):
+        # custom slippage math
+        slippage = d.Decimal(asset.Price) * d.Decimal(0.002 * np.log10(2*float(order.AbsoluteQuantity)))
+        self.algorithm.Log("CustomSlippageModel: " + str(slippage))
+        return slippage# reference:
